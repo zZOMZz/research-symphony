@@ -1,6 +1,6 @@
 import { Issue, ServiceConfig, CodexEvent } from "../types.js";
 import { AgentBackend, AgentSession, TurnResult } from "./interface.js";
-import * as appServer from "../codex/app_server.js";
+import * as appServer from "./codex_app_server.js";
 
 export class CodexBackend implements AgentBackend {
   async startSession(workspace: string, config: ServiceConfig): Promise<AgentSession> {

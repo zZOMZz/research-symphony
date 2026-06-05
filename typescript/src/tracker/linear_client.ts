@@ -1,5 +1,5 @@
 import { Issue, BlockerRef } from "../types.js";
-import { TrackerClient } from "../tracker/interface.js";
+import { TrackerClient } from "./interface.js";
 import { logger } from "../logger.js";
 
 export interface LinearClientConfig {

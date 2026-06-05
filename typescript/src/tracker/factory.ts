@@ -1,6 +1,6 @@
 import { ServiceConfig } from "../types.js";
 import { TrackerClient } from "./interface.js";
-import { LinearClient } from "../linear/client.js";
+import { LinearClient } from "./linear_client.js";
 
 export function createTrackerClient(config: ServiceConfig): TrackerClient {
   switch (config.tracker.kind) {
