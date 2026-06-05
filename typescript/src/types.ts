@@ -111,6 +111,7 @@ export interface AgentConfig {
   max_turns: number;
   max_retry_backoff_ms: number;
   max_concurrent_agents_by_state: Record<string, number>;
+  backend: string;
 }
 
 export interface CodexConfig {
@@ -121,6 +122,13 @@ export interface CodexConfig {
   turn_timeout_ms: number;
   read_timeout_ms: number;
   stall_timeout_ms: number;
+}
+
+export interface ClaudeCodeConfig {
+  command: string;
+  model: string | null;
+  max_turns: number | null;
+  allowed_tools: string[];
 }
 
 export interface ServerConfig {
@@ -135,5 +143,6 @@ export interface ServiceConfig {
   hooks: HooksConfig;
   agent: AgentConfig;
   codex: CodexConfig;
+  claude_code: ClaudeCodeConfig;
   server: ServerConfig;
 }

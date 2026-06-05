@@ -8,7 +8,7 @@ import {
   ServiceConfig,
 } from "./types.js";
 import { getSettings, validateDispatchConfig, maxConcurrentAgentsForState } from "./config.js";
-import { LinearClient } from "./linear/client.js";
+import { createTrackerClient, TrackerClient } from "./tracker/index.js";
 import { runAgent } from "./agent_runner.js";
 import * as workspace from "./workspace.js";
 import { logger } from "./logger.js";
@@ -188,7 +188,7 @@ export class Orchestrator {
     }
 
     try {
-      const client = this.createLinearClient(config);
+      const client = this.createTrackerClient(config);
       const candidates = await client.fetchCandidateIssues();
       const sorted = this.sortForDispatch(candidates);
 
@@ -223,7 +223,7 @@ export class Orchestrator {
 
     const config = getSettings();
     try {
-      const client = this.createLinearClient(config);
+      const client = this.createTrackerClient(config);
       const refreshed = await client.fetchIssueStatesByIds(runningIds);
 
       const refreshedMap = new Map(refreshed.map((i) => [i.id, i]));
@@ -503,7 +503,7 @@ export class Orchestrator {
 
     const config = getSettings();
     try {
-      const client = this.createLinearClient(config);
+      const client = this.createTrackerClient(config);
       const candidates = await client.fetchCandidateIssues();
       const issue = candidates.find((i) => i.id === issueId);
 
@@ -554,7 +554,7 @@ export class Orchestrator {
   private async runTerminalWorkspaceCleanup(): Promise<void> {
     const config = getSettings();
     try {
-      const client = this.createLinearClient(config);
+      const client = this.createTrackerClient(config);
       const terminalIssues = await client.fetchIssuesByStates(config.tracker.terminal_states);
       for (const issue of terminalIssues) {
         await workspace.removeWorkspace(config, issue.identifier).catch((err) => {
@@ -567,14 +567,8 @@ export class Orchestrator {
     }
   }
 
-  private createLinearClient(config: ServiceConfig): LinearClient {
-    return new LinearClient({
-      endpoint: config.tracker.endpoint,
-      api_key: config.tracker.api_key!,
-      project_slug: config.tracker.project_slug!,
-      active_states: config.tracker.active_states,
-      terminal_states: config.tracker.terminal_states,
-    });
+  private createTrackerClient(config: ServiceConfig): TrackerClient {
+    return createTrackerClient(config);
   }
 }
 

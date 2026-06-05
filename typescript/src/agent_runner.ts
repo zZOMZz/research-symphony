@@ -1,9 +1,9 @@
 import { Issue, ServiceConfig, CodexEvent } from "./types.js";
 import { getSettings } from "./config.js";
 import { buildPrompt } from "./prompt.js";
-import { LinearClient } from "./linear/client.js";
+import { createTrackerClient, TrackerClient } from "./tracker/index.js";
+import { createAgentBackend, AgentBackend, AgentSession } from "./agent/index.js";
 import * as workspace from "./workspace.js";
-import * as appServer from "./codex/app_server.js";
 import { logger } from "./logger.js";
 
 export interface AgentRunOptions {
@@ -28,13 +28,13 @@ export async function runAgent(issue: Issue, opts: AgentRunOptions = {}): Promis
       throw new Error("Cancelled before agent session start");
     }
 
-    await runCodexTurns(config, ws.path, issue, attempt ?? null, onCodexUpdate, signal);
+    await runAgentTurns(config, ws.path, issue, attempt ?? null, onCodexUpdate, signal);
   } finally {
     await workspace.runAfterRunHook(config, ws.path);
   }
 }
 
-async function runCodexTurns(
+async function runAgentTurns(
   config: ServiceConfig,
   wsPath: string,
   issue: Issue,
@@ -43,10 +43,12 @@ async function runCodexTurns(
   signal: AbortSignal | undefined,
 ): Promise<void> {
   const maxTurns = config.agent.max_turns;
-  let session: appServer.AppServerSession | null = null;
+  const backend: AgentBackend = createAgentBackend(config);
+  const tracker: TrackerClient = createTrackerClient(config);
+  let session: AgentSession | null = null;
 
   try {
-    session = await appServer.startSession(wsPath, config);
+    session = await backend.startSession(wsPath, config);
 
     let turnNumber = 1;
     let currentIssue = issue;
@@ -59,11 +61,9 @@ async function runCodexTurns(
         if (onCodexUpdate) onCodexUpdate(issue.id, event);
       };
 
-      const toolExecutor = createToolExecutor(config);
+      await session.runTurn(prompt, currentIssue, onMessage);
 
-      await appServer.runTurn(session, prompt, currentIssue, onMessage, toolExecutor);
-
-      const refreshedIssue = await refreshIssueState(config, issue.id);
+      const refreshedIssue = await refreshIssueState(tracker, issue.id);
       if (refreshedIssue) {
         currentIssue = refreshedIssue;
       }
@@ -82,7 +82,7 @@ async function runCodexTurns(
     }
   } finally {
     if (session) {
-      appServer.stopSession(session);
+      session.stop();
     }
   }
 }
@@ -95,28 +95,12 @@ function buildTurnPrompt(issue: Issue, attempt: number | null, turnNumber: numbe
   return `Continue working on this issue. You are on turn ${turnNumber}/${maxTurns}. The issue is still in an active state (${issue.state}). Continue where you left off.`;
 }
 
-async function refreshIssueState(config: ServiceConfig, issueId: string): Promise<Issue | null> {
+async function refreshIssueState(tracker: TrackerClient, issueId: string): Promise<Issue | null> {
   try {
-    const client = new LinearClient({
-      endpoint: config.tracker.endpoint,
-      api_key: config.tracker.api_key!,
-      project_slug: config.tracker.project_slug!,
-      active_states: config.tracker.active_states,
-      terminal_states: config.tracker.terminal_states,
-    });
-    const issues = await client.fetchIssueStatesByIds([issueId]);
+    const issues = await tracker.fetchIssueStatesByIds([issueId]);
     return issues.length > 0 ? issues[0] : null;
   } catch (err) {
     logger.warn("issue_state_refresh_failed", { issue_id: issueId, error: String(err) });
     return null;
   }
-}
-
-function createToolExecutor(config: ServiceConfig) {
-  return (toolName: string | null, args: Record<string, unknown>): { success: boolean; output: string } => {
-    if (toolName === "linear_graphql" && config.tracker.kind === "linear" && config.tracker.api_key) {
-      return { success: false, output: "linear_graphql tool is async-only in this implementation; use direct API." };
-    }
-    return { success: false, output: `Unsupported tool: ${toolName ?? "unknown"}` };
-  };
 }

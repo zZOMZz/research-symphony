@@ -8,6 +8,7 @@ import {
   HooksConfig,
   AgentConfig,
   CodexConfig,
+  ClaudeCodeConfig,
   ServerConfig,
 } from "./types.js";
 import { currentWorkflow, getWorkflowFilePath } from "./workflow.js";
@@ -39,6 +40,7 @@ const DEFAULTS: ServiceConfig = {
     max_turns: 20,
     max_retry_backoff_ms: 300000,
     max_concurrent_agents_by_state: {},
+    backend: "codex",
   },
   codex: {
     command: "codex app-server",
@@ -54,6 +56,12 @@ const DEFAULTS: ServiceConfig = {
     turn_timeout_ms: 3600000,
     read_timeout_ms: 5000,
     stall_timeout_ms: 300000,
+  },
+  claude_code: {
+    command: "claude",
+    model: null,
+    max_turns: null,
+    allowed_tools: [],
   },
   server: {
     port: null,
@@ -96,6 +104,7 @@ export function parseConfig(raw: Record<string, unknown>): ServiceConfig {
     hooks: parseHooks(normalized.hooks as Record<string, unknown> | undefined),
     agent: parseAgent(normalized.agent as Record<string, unknown> | undefined),
     codex: parseCodex(normalized.codex as Record<string, unknown> | undefined),
+    claude_code: parseClaudeCode(normalized.claude_code as Record<string, unknown> | undefined),
     server: parseServer(normalized.server as Record<string, unknown> | undefined),
   };
 }
@@ -143,6 +152,7 @@ function parseAgent(raw?: Record<string, unknown>): AgentConfig {
     max_turns: asPositiveInt(raw.max_turns, DEFAULTS.agent.max_turns),
     max_retry_backoff_ms: asPositiveInt(raw.max_retry_backoff_ms, DEFAULTS.agent.max_retry_backoff_ms),
     max_concurrent_agents_by_state: normalizeStateLimits(byState),
+    backend: asString(raw.backend, DEFAULTS.agent.backend),
   };
 }
 
@@ -156,6 +166,16 @@ function parseCodex(raw?: Record<string, unknown>): CodexConfig {
     turn_timeout_ms: asPositiveInt(raw.turn_timeout_ms, DEFAULTS.codex.turn_timeout_ms),
     read_timeout_ms: asPositiveInt(raw.read_timeout_ms, DEFAULTS.codex.read_timeout_ms),
     stall_timeout_ms: asNonNegativeInt(raw.stall_timeout_ms, DEFAULTS.codex.stall_timeout_ms),
+  };
+}
+
+function parseClaudeCode(raw?: Record<string, unknown>): ClaudeCodeConfig {
+  if (!raw) return { ...DEFAULTS.claude_code };
+  return {
+    command: asString(raw.command, DEFAULTS.claude_code.command),
+    model: asStringOrNull(raw.model),
+    max_turns: raw.max_turns != null ? asPositiveInt(raw.max_turns, 0) || null : null,
+    allowed_tools: asStringArray(raw.allowed_tools, DEFAULTS.claude_code.allowed_tools),
   };
 }
 

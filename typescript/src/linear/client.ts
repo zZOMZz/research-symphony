@@ -1,4 +1,5 @@
 import { Issue, BlockerRef } from "../types.js";
+import { TrackerClient } from "../tracker/interface.js";
 import { logger } from "../logger.js";
 
 export interface LinearClientConfig {
@@ -81,7 +82,7 @@ query SymphonyLinearIssuesByStates($projectSlug: String!, $stateNames: [String!]
   }
 }`;
 
-export class LinearClient {
+export class LinearClient implements TrackerClient {
   private config: LinearClientConfig;
 
   constructor(config: LinearClientConfig) {
